@@ -40,6 +40,13 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;}
 #dot{position:fixed;bottom:20px;left:16px;width:8px;height:8px;border-radius:50%;opacity:0;transition:opacity 0.25s;z-index:60;}
 #dot.ok{background:#e01010;box-shadow:0 0 7px rgba(220,16,16,0.9);opacity:1;}
 #dot.err{background:#e07010;opacity:0.75;}
+/* 隱藏 input 用來捕捉藍芽遙控器輸入 */
+#remote-input{
+  position:fixed;top:0;left:0;width:1px;height:1px;
+  opacity:0;border:none;outline:none;background:transparent;
+  color:transparent;font-size:16px;
+  z-index:1000;
+}
 </style>
 </head>
 <body>
@@ -52,6 +59,8 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;}
 </div>
 <div id="pbar-wrap"><div id="pbar"></div></div>
 <div id="dot"></div>
+<!-- 隱藏 input：捕捉藍芽遙控器按鍵 -->
+<input id="remote-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
 <script>
 const SUITS=['♥','♦','♠','♣'];
@@ -268,40 +277,51 @@ function pressDir(d){
   else if(phase===1){clearTimeout(cTimer);const rk=RMAP[fd+'-'+d];if(rk){pr=rk;phase=2;startCT();}else{fd=d;phase=1;startCT();}}
   else if(phase===2){clearTimeout(cTimer);const su=SMAP[d];if(su&&pr){targetCard={r:pr,s:su};pushDeep();resetCombo();setDot('ok');}else{resetCombo();setDot('err');}}
 }
-// 遙控器按鍵序列緩衝
-let remoteBuffer='';
+// ── 遙控器輸入處理 ──
+const remoteInput=document.getElementById('remote-input');
 let remoteTimer=null;
 
-function handleRemoteBuffer(buf){
-  // 時鐘法方向對應
-  if(buf==='jn') pressDir('up');
-  else if(buf==='im') pressDir('left');
-  else if(buf==='hr') pressDir('right');
-  else if(buf==='yt') pressDir('down');
+// 保持 focus 在隱藏 input（讓遙控器輸入被捕捉）
+function keepFocus(){
+  remoteInput.focus();
+}
+document.addEventListener('touchend',keepFocus,{passive:true});
+document.addEventListener('click',keepFocus);
+// 頁面載入後立即 focus
+setTimeout(keepFocus,500);
+
+function handleRemote(val){
+  val=val.toLowerCase();
+  if(val==='jn')      pressDir('up');
+  else if(val==='im') pressDir('left');
+  else if(val==='hr') pressDir('right');
+  else if(val==='yt') pressDir('down');
+  else if(val==='ij'||val==='ji'||val===' '||val==='
+') triggerPause();
 }
 
-document.addEventListener('keydown',e=>{
-  // 鍵盤方向鍵（測試用）
-  switch(e.key){
-    case 'ArrowUp':e.preventDefault();pressDir('up');return;
-    case 'ArrowDown':e.preventDefault();pressDir('down');return;
-    case 'ArrowLeft':e.preventDefault();pressDir('left');return;
-    case 'ArrowRight':e.preventDefault();pressDir('right');return;
-    case ' ':case 'Enter':e.preventDefault();triggerPause();return;
-    case 'r':case 'R':resetAll();return;
-  }
+// 監聽 input 事件（遙控器輸入文字進 input 欄位）
+remoteInput.addEventListener('input',function(){
+  clearTimeout(remoteTimer);
+  const val=remoteInput.value;
+  remoteTimer=setTimeout(()=>{
+    if(val.length>0){
+      handleRemote(val);
+      remoteInput.value='';
+    }
+  },60);
 });
 
-// 遙控器發出兩個字母組合，用 keypress 捕捉
-document.addEventListener('keypress',e=>{
-  remoteBuffer+=e.key;
-  clearTimeout(remoteTimer);
-  // 累積 80ms 內的按鍵，湊成完整組合再判斷
-  remoteTimer=setTimeout(()=>{
-    const buf=remoteBuffer;
-    remoteBuffer='';
-    handleRemoteBuffer(buf);
-  },80);
+// 同時監聽 keydown（方向鍵不會觸發 input 事件）
+document.addEventListener('keydown',e=>{
+  switch(e.key){
+    case 'ArrowUp':   e.preventDefault();pressDir('up');break;
+    case 'ArrowDown': e.preventDefault();pressDir('down');break;
+    case 'ArrowLeft': e.preventDefault();pressDir('left');break;
+    case 'ArrowRight':e.preventDefault();pressDir('right');break;
+    case ' ':case 'Enter':e.preventDefault();triggerPause();break;
+    case 'r':case 'R':resetAll();break;
+  }
 });
 leftPile.addEventListener('mousedown',e=>{onStart(e.clientX,e.clientY);e.preventDefault();});
 document.addEventListener('mousemove',e=>{if(dragging)onMove(e.clientX,e.clientY);});
