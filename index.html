@@ -268,15 +268,40 @@ function pressDir(d){
   else if(phase===1){clearTimeout(cTimer);const rk=RMAP[fd+'-'+d];if(rk){pr=rk;phase=2;startCT();}else{fd=d;phase=1;startCT();}}
   else if(phase===2){clearTimeout(cTimer);const su=SMAP[d];if(su&&pr){targetCard={r:pr,s:su};pushDeep();resetCombo();setDot('ok');}else{resetCombo();setDot('err');}}
 }
+// 遙控器按鍵序列緩衝
+let remoteBuffer='';
+let remoteTimer=null;
+
+function handleRemoteBuffer(buf){
+  // 時鐘法方向對應
+  if(buf==='jn') pressDir('up');
+  else if(buf==='im') pressDir('left');
+  else if(buf==='hr') pressDir('right');
+  else if(buf==='yt') pressDir('down');
+}
+
 document.addEventListener('keydown',e=>{
+  // 鍵盤方向鍵（測試用）
   switch(e.key){
-    case 'ArrowUp':e.preventDefault();pressDir('up');break;
-    case 'ArrowDown':e.preventDefault();pressDir('down');break;
-    case 'ArrowLeft':e.preventDefault();pressDir('left');break;
-    case 'ArrowRight':e.preventDefault();pressDir('right');break;
-    case ' ':case 'Enter':e.preventDefault();triggerPause();break;
-    case 'r':case 'R':resetAll();break;
+    case 'ArrowUp':e.preventDefault();pressDir('up');return;
+    case 'ArrowDown':e.preventDefault();pressDir('down');return;
+    case 'ArrowLeft':e.preventDefault();pressDir('left');return;
+    case 'ArrowRight':e.preventDefault();pressDir('right');return;
+    case ' ':case 'Enter':e.preventDefault();triggerPause();return;
+    case 'r':case 'R':resetAll();return;
   }
+});
+
+// 遙控器發出兩個字母組合，用 keypress 捕捉
+document.addEventListener('keypress',e=>{
+  remoteBuffer+=e.key;
+  clearTimeout(remoteTimer);
+  // 累積 80ms 內的按鍵，湊成完整組合再判斷
+  remoteTimer=setTimeout(()=>{
+    const buf=remoteBuffer;
+    remoteBuffer='';
+    handleRemoteBuffer(buf);
+  },80);
 });
 leftPile.addEventListener('mousedown',e=>{onStart(e.clientX,e.clientY);e.preventDefault();});
 document.addEventListener('mousemove',e=>{if(dragging)onMove(e.clientX,e.clientY);});
